@@ -25,12 +25,13 @@ dependencies {
     implementation(libs.guava)
     implementation("com.microsoft.playwright:playwright:1.52.0")
     implementation("tech.tablesaw:tablesaw-core:0.43.1")
+    implementation("com.google.genai:google-genai:1.0.0")
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(11)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 

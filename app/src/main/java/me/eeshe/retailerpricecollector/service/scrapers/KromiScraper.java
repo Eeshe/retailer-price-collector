@@ -32,17 +32,18 @@ public class KromiScraper extends Scraper {
       // "CAR",
       // "CHA",
       // "CMT",
-      // "FER",
-      // "HOG",
-      // "JAR",
-      // "JUG",
-      // "LIC",
-      // "LIM",
-      // "NAT",
-      // "PES",
-      // "QCL",
-      // "RYC",
-      "VYH");
+      "FER"
+  // "HOG",
+  // "JAR",
+  // "JUG",
+  // "LIC",
+  // "LIM",
+  // "NAT",
+  // "PES",
+  // "QCL",
+  // "RYC",
+  // "VYH"
+  );
 
   public void run() {
     // Start the futures that will scrape all the products from each category
@@ -75,7 +76,7 @@ public class KromiScraper extends Scraper {
    */
   private List<Product> scrapeProductCategory(String categoryId) {
     try (Playwright playwright = Playwright.create()) {
-      Browser browser = launchBrowser(playwright, false);
+      Browser browser = launchBrowser(playwright, true);
 
       // First, get product URLs from the category page
       Page page = browser.newPage();
@@ -112,7 +113,7 @@ public class KromiScraper extends Scraper {
   private List<Product> scrapeProductUrls(String categoryId, Set<String> productUrls) {
     List<Product> products = new ArrayList<>();
     try (Playwright playwright = Playwright.create()) {
-      Browser browser = launchBrowser(playwright, false);
+      Browser browser = launchBrowser(playwright, true);
       Page page = browser.newPage();
       page.navigate("https://www.kromionline.com/");
 
