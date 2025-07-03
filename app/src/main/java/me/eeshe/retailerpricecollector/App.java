@@ -3,10 +3,11 @@
  */
 package me.eeshe.retailerpricecollector;
 
-import me.eeshe.retailerpricecollector.service.scrapers.KromiScraper;
+import me.eeshe.retailerpricecollector.service.ProductFormatter;
 
 public class App {
   public static void main(String[] args) {
-    new KromiScraper().run();
+    // new KromiScraper().run();
+    new ProductFormatter().run();
   }
 }

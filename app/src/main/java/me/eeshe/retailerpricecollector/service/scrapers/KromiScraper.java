@@ -1,5 +1,6 @@
 package me.eeshe.retailerpricecollector.service.scrapers;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -157,7 +158,10 @@ public class KromiScraper extends Scraper {
       row.setString("name", product.getName());
       row.setDouble("price", product.getPrice());
     }
-
-    table.write().csv("../output/products.csv");
+    File outputDirectory = new File("../output");
+    if (!outputDirectory.exists()) {
+      outputDirectory.mkdir();
+    }
+    table.write().csv("../output/raw_products.csv");
   }
 }

@@ -3,7 +3,7 @@ package me.eeshe.retailerpricecollector.model;
 public class Product {
   private final String barCode;
   private final String categoryId;
-  private final String name;
+  private String name;
   private final double price;
 
   public Product(String barCode, String categoryId, String name, double price) {
@@ -23,6 +23,10 @@ public class Product {
 
   public String getName() {
     return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
   }
 
   public double getPrice() {
