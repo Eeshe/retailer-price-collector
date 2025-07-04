@@ -18,6 +18,7 @@ import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.AriaRole;
 
 import me.eeshe.retailerpricecollector.model.Product;
+import me.eeshe.retailerpricecollector.util.TableUtil;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.Row;
 import tech.tablesaw.api.StringColumn;
@@ -26,47 +27,47 @@ import tech.tablesaw.api.Table;
 public class KromiScraper extends Scraper {
 
   private static final List<String> CATEGORY_IDS = List.of(
-      // "VIV",
-      // "ANI",
-      // "AUT",
-      // "CAM",
-      // "CAR",
-      // "CHA",
-      // "CMT",
-      "FER"
-  // "HOG",
-  // "JAR",
-  // "JUG",
-  // "LIC",
-  // "LIM",
-  // "NAT",
-  // "PES",
-  // "QCL",
-  // "RYC",
-  // "VYH"
-  );
+      "VIV",
+      "ANI",
+      "AUT",
+      "CAM",
+      "CAR",
+      "CHA",
+      "CMT",
+      "FER",
+      "HOG",
+      "JAR",
+      "JUG",
+      "LIC",
+      "LIM",
+      "NAT",
+      "PES",
+      "QCL",
+      "RYC",
+      "VYH");
 
   public void run() {
     // Start the futures that will scrape all the products from each category
-    ExecutorService executor = Executors.newFixedThreadPool(3);
-    List<Future<List<Product>>> futures = new ArrayList<>();
-    for (String categoryId : CATEGORY_IDS) {
-      Future<List<Product>> future = executor.submit(() -> scrapeProductCategory(categoryId));
-      futures.add(future);
-    }
-
-    // Collect the data from the futures as they are completed
-    List<Product> products = new ArrayList<>();
-    for (Future<List<Product>> future : futures) {
-      try {
-        products.addAll(future.get());
-      } catch (InterruptedException | ExecutionException e) {
-        e.printStackTrace();
+    try (ExecutorService executor = Executors.newFixedThreadPool(3)) {
+      List<Future<List<Product>>> futures = new ArrayList<>();
+      for (String categoryId : CATEGORY_IDS) {
+        Future<List<Product>> future = executor.submit(() -> scrapeProductCategory(categoryId));
+        futures.add(future);
       }
-    }
 
-    // Write the results to a .csv file
-    writeToCsv(products);
+      // Collect the data from the futures as they are completed
+      List<Product> products = new ArrayList<>();
+      for (Future<List<Product>> future : futures) {
+        try {
+          products.addAll(future.get());
+        } catch (InterruptedException | ExecutionException e) {
+          e.printStackTrace();
+        }
+      }
+
+      // Write the results to a .csv file
+      writeToCsv(products);
+    }
   }
 
   /**
@@ -77,7 +78,7 @@ public class KromiScraper extends Scraper {
    */
   private List<Product> scrapeProductCategory(String categoryId) {
     try (Playwright playwright = Playwright.create()) {
-      Browser browser = launchBrowser(playwright, true);
+      Browser browser = launchBrowser(playwright, false);
 
       // First, get product URLs from the category page
       Page page = browser.newPage();
@@ -87,11 +88,39 @@ public class KromiScraper extends Scraper {
       page.waitForSelector("#pasilloDeProductos");
 
       scrollPage(page, "#loadingMore");
-      Set<String> productUrls = extractProductUrls(page);
+      List<String> productUrls = extractProductUrls(page);
       page.close();
       browser.close();
 
-      return scrapeProductUrls(categoryId, productUrls);
+      final int totalThreads = 5;
+      try (ExecutorService executorService = Executors.newFixedThreadPool(totalThreads)) {
+        int productUrlsPerThread = productUrls.size() / totalThreads;
+        List<Future<List<Product>>> futures = new ArrayList<>();
+        for (int thread = 1; thread <= totalThreads; thread++) {
+          List<String> productUrlsSublist;
+          if (thread == totalThreads) {
+            productUrlsSublist = productUrls;
+          } else {
+            productUrlsSublist = new ArrayList<>();
+            for (int i = 0; i < productUrlsPerThread; i++) {
+              productUrlsSublist.add(productUrls.removeFirst());
+            }
+          }
+          futures.add(executorService.submit(() -> scrapeProductUrls(
+              categoryId,
+              productUrlsSublist)));
+        }
+
+        List<Product> products = new ArrayList<>();
+        for (Future<List<Product>> future : futures) {
+          try {
+            products.addAll(future.get());
+          } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+          }
+        }
+        return products;
+      }
     }
   }
 
@@ -101,8 +130,8 @@ public class KromiScraper extends Scraper {
    * @param page Page to extract URLs from.
    * @return List of product URLs.
    */
-  private Set<String> extractProductUrls(Page page) {
-    Set<String> productUrls = new HashSet<>();
+  private List<String> extractProductUrls(Page page) {
+    List<String> productUrls = new ArrayList<>();
     for (Locator locator : page.locator(".nombre_producto").all()) {
       for (Locator link : locator.getByRole(AriaRole.LINK).all()) {
         productUrls.add("https://www.kromionline.com/" + link.getAttribute("href"));
@@ -111,15 +140,16 @@ public class KromiScraper extends Scraper {
     return productUrls;
   }
 
-  private List<Product> scrapeProductUrls(String categoryId, Set<String> productUrls) {
+  private List<Product> scrapeProductUrls(String categoryId, List<String> productUrls) {
     List<Product> products = new ArrayList<>();
     try (Playwright playwright = Playwright.create()) {
-      Browser browser = launchBrowser(playwright, true);
+      Browser browser = launchBrowser(playwright, false);
       Page page = browser.newPage();
       page.navigate("https://www.kromionline.com/");
 
-      for (String productUrl : productUrls)
+      for (String productUrl : productUrls) {
         products.add(scrapeProduct(productUrl, categoryId, page));
+      }
     }
     return products;
   }
@@ -131,7 +161,6 @@ public class KromiScraper extends Scraper {
    * @return Scraped product.
    */
   private Product scrapeProduct(String productUrl, String categoryId, Page page) {
-    // System.out.println("PRODUCT URL: " + productUrl);
     page.navigate(productUrl);
 
     String barCode = page.locator(".bar_code_span").textContent();
@@ -139,9 +168,6 @@ public class KromiScraper extends Scraper {
     double price = Double.parseDouble(page.locator(".tag_precio_producto").textContent()
         .replace("$", ""));
 
-    // System.out.println("BAR CODE: " + barCode);
-    // System.out.println("NAME: " + name);
-    // System.out.println("PRICE: " + price);
     return new Product(barCode, categoryId, name, price);
   }
 
@@ -158,10 +184,6 @@ public class KromiScraper extends Scraper {
       row.setString("name", product.getName());
       row.setDouble("price", product.getPrice());
     }
-    File outputDirectory = new File("../output");
-    if (!outputDirectory.exists()) {
-      outputDirectory.mkdir();
-    }
-    table.write().csv("../output/raw_products.csv");
+    TableUtil.writeTableFile(table, new File("../output/raw_products.csv"));
   }
 }
